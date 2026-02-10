@@ -1,0 +1,12 @@
+
+npx webpack ./src/main.js --mode=development  开发环境
+
+npx webpack ./src/main.js --mode=production   生产环境
+
+./src/main.js是入口， --mode=development是开发环境。
+
+
+注意：
+此时还没有使用，配置文件webpack.confit.js。
+所以打这个命令时，不需要webpack.confit.js配置文件，要不然会报错。
+
