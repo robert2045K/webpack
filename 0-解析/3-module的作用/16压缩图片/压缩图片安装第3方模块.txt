@@ -1,0 +1,13 @@
+安装： npm install image-minimizer-webpack-plugin --save-dev
+
+
+Explore the options to get the best result for you.
+Recommended imagemin plugins for lossless optimization
+安装：     npm install imagemin-gifsicle imagemin-jpegtran imagemin-optipng imagemin-svgo --save-dev
+
+
+Recommended imagemin plugins for lossy optimization
+安装： npm install imagemin-gifsicle imagemin-mozjpeg imagemin-pngquant imagemin-svgo --save-dev
+
+
+安装： npm install imagemin --save-dev

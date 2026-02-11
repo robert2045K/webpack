@@ -1,69 +1,6 @@
 const path = require('path')
-module.exports = {
-    //入口, 相对路径，
-    entry: './src/main.js',
-    //输出，用绝对路径，为了确保无论你在哪里执行 npm run build，文件都能准确无误地生成在项目文件夹下的 dist 目录中
-    output: {
-        // __dirname是node.js的变量，代表当前文件的目录路径
-        path: path.resolve(__dirname, 'dist'),
-        filename: 'main.js'
-    },
-    //加载器
-    module: {
-        rules:[
-            // loader的配置
-            // 示例：处理 CSS 资源
-            // {
-            //     test: /\.css$/, // 只检测 .css 文件
-            //     use: ['style-loader', 'css-loader'] // 执行顺序：从右到左（先 css-loader 后 style-loader）
-            // },
-            // 示例：处理图片资源 (Webpack 5 写法，不需要 loader)
-            // {
-            //     test: /\.(png|jpe?g|gif|webp)$/,
-            //     type: 'asset',
-            //     parser: { dataUrlCondition: { maxSize: 10 * 1024 } } // 小于10kb转base64
-            // }
-        ]
-    },
-    //插件
-    plugins: [
-
-    ],
-    //模式
-    mode: 'development'
-
-}
-
-
-
-const path = require('path')
 const ESLintPlugin = require('eslint-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-
-//公共方法， css样式处理. pre是添加其他loader
-function  getStyleLoader(pre) {
-    return [
-        //压缩css。之前是style-loader,但没压缩功能。 所以换成MiniCssExtractPlugin.loader。
-        MiniCssExtractPlugin.loader,
-        'css-loader', // 将css资源编译成commonjs的模块到js中
-        //兼容性处理， 这里用了对象，因为有参数设置。 如果不设置参数，直接写postcss-loader就可以了。
-        {
-
-            loader: "postcss-loader",
-            options: {
-                postcssOptions: {
-                    plugins:[
-                        "postcss-preset-env",
-                    ]
-                }
-
-            },
-        },
-        pre
-    ].filter(Boolean)
-}
-
 module.exports = {
     //入口, 相对路径，
     entry: './src/main.js',
@@ -76,8 +13,8 @@ module.exports = {
     //输出，用绝对路径，为了确保无论你在哪里执行 npm run build，文件都能准确无误地生成在项目文件夹下的 dist 目录中
     output: {
         // __dirname是node.js的变量，代表当前目录路径， 也就是webpack文件夹的路径
-        path: path.resolve(__dirname, '../dist'),
-        filename: 'js/main.js',
+        path: path.resolve(__dirname, 'dist'),
+        filename: './js/main.js',
         clean: true
     },
     //module的作用：
@@ -102,19 +39,31 @@ module.exports = {
                 // css-loader会把css编译成js中。 也就是编译到commonjs格式的js中。
                 // style-loader,将编译好的css的js代码，创建style标签，添加到html文件中。
                 test: /\.css$/i,
-                use: getStyleLoader(),
+                use: ['style-loader', 'css-loader'],
             },
             {
                 // npm install less less-loader --save-dev
                 //这些配置，是从webpack的官网上复制的。
                 test: /\.less$/i,
-                use: getStyleLoader("less-loader"),
+                use: [
+                    // compiles Less to CSS
+                    'style-loader',
+                    'css-loader',
+                    'less-loader',
+                ],
             },
             {
                 //npm install sass-loader sass webpack --save-dev
                 //sass, sass都是sass
                 test: /\.s[ac]ss$/i,
-                use: getStyleLoader("sass-loader"),
+                use: [
+                    // 将 JS 字符串生成为 style 节点
+                    'style-loader',
+                    // 将 CSS 转化成 CommonJS 模块
+                    'css-loader',
+                    // 将 Sass 编译成 CSS
+                    'sass-loader',
+                ],
             },
             {
                 //资源模块(asset module)是一种模块类型，它允许使用资源文件（字体，图标等）而无需配置额外 loader。
@@ -159,21 +108,14 @@ module.exports = {
         // 4. DefinePlugin: 定义环境变量给代码使用
         new ESLintPlugin({
             // ESLint检测哪些文件。
-            context: path.resolve(__dirname, '../src'),
+            context: path.resolve(__dirname, 'src'),
         }),
         new HtmlWebpackPlugin({
             // 使用模板public/index.html'
-            template: path.resolve(__dirname, '../public/index.html'),
-        }),
-        //压缩css插件
-        new MiniCssExtractPlugin({
-            filename:"static/css/[name].[contenthash:10].css"
-        }),
+            template: path.resolve(__dirname, 'public/index.html'),
+        })
     ],
     //模式
-    mode: 'production'
+    mode: 'development'
 
 }
-
-
-

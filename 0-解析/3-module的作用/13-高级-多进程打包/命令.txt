@@ -1,0 +1,3 @@
+npm i thread-loader -D
+
+npm install --save-dev thread-loader
