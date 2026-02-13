@@ -6,6 +6,16 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 //压缩css
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 
+//压缩图片
+const ImageMinimizerPlugin = require('image-minimizer-webpack-plugin');
+const os = require("os")
+const TerserWebpackPlugin = require("terser-webpack-plugin")
+const PreloadWebpackPlugin = require('@vue/preload-webpack-plugin')
+const WorkboxPlugin = require('workbox-webpack-plugin');
+
+//获取cpu的核数
+const threads = os.cpus().length;
+
 
 //公共方法， css样式处理. pre是添加其他loader
 /**
@@ -44,6 +54,13 @@ function  getStyleLoader(pre) {
     ].filter(Boolean)
 }
 
+/**
+ * 当 Webpack 尝试分割代码（例如将 node_modules 提取到单独的 chunk）时，它需要为每个 chunk 生成一个文件。如果 output.filename 是固定的字符串，多个 chunk 就会试图写入同一个文件，从而导致冲突。
+ * 解决方法：
+ * 你需要修改 webpackConfig/webpack.pro.js 中的 output.filename，使用占位符 [name] 来确保每个 chunk 有唯一的文件名。
+ * 我将把 filename: 'js/main.js' 修改为 filename: 'js/[name].js'。
+ * @type {{entry: string, devServer: {host: string, port: number, open: boolean}, output: {path: string, filename: string, clean: boolean}, module: {rules: [{oneOf}]}, plugins: (ESLintWebpackPlugin|HtmlWebpackPlugin|MiniCssExtractPlugin)[], optimization: {minimizer: [CssMinimizerPlugin<CssNanoOptionsExtended>,*,ImageMinimizerPlugin<unknown, unknown>], splitChunks: {chunks: string}}, mode: string, devtool: string}}
+ */
 module.exports = {
     //入口, 相对路径，
     entry: './src/main.js',
@@ -57,7 +74,10 @@ module.exports = {
     output: {
         // __dirname是node.js的变量，代表当前目录路径， 也就是webpack文件夹的路径
         path: path.resolve(__dirname, '../dist'),
-        filename: 'js/main.js',
+        filename: 'js/[name].js',
+        chunkFilename: "js/[name].chunk.js",
+        //图片，字体等通过type:asset处理的资源命名。
+        //assetModuleFilename: 'static/assets/[hash:10][ext][query]',
         clean: true
     },
     //module的作用：
@@ -76,13 +96,26 @@ module.exports = {
                         exclude: /(node_modules|bower_components)/,
                         // exclude: /node_modules/, //排除node_modules第3方库。因为第3方库转换换成es5了已经，不需要再处理。
                         include: path.resolve(__dirname, '../src'), // 只处理src目录下的js文件，其他目录下的文件不处理。
-                        use: {
-                            loader: 'babel-loader',
-                            options: {
-                                presets: ['@babel/preset-env'],
-                                plugins: ["@babel/plugin-transform-runtime"], //减少代码体积
+                        use: [
+                            {
+                                loader: "thread-loader", //开启多进程，
+                                options: {
+                                    works: threads, //进程数据。
+                                }
                             },
-                        },
+                            {
+                                loader: 'babel-loader',
+                                options: {
+                                    presets: [
+                                        ['@babel/preset-env', {
+                                            useBuiltIns: "usage", //按需加载core-js，cs6以上cs7语法的兼容性包,
+                                            corejs: 3, //core-js版本
+                                        }]
+                                    ],
+                                    plugins: ["@babel/plugin-transform-runtime"], //减少代码体积
+                                },
+                            },
+                        ]
                     },
                     {
                         //遇到.css, 就使用'style-loader', 'css-loader'
@@ -152,17 +185,85 @@ module.exports = {
             context: path.resolve(__dirname, '../src'),
             cache:true, //开启缓存
             cacheLocation: path.resolve(__dirname, '../node_modules/.cache/eslintCache'),
+            threads, //开启多进程和设置进程数据。
         }),
         new HtmlWebpackPlugin({
             // 使用模板public/index.html'
             template: path.resolve(__dirname, '../public/index.html'),
+            minify: false, // 禁用压缩，保持格式化
         }),
         //将 CSS 提取为单独的文件
         new MiniCssExtractPlugin({
-            filename:"static/css/[name].[contenthash:10].css"
+            filename:"static/css/[name].[contenthash:10].css",
+            //动态引入的css资源, 命名可以用这个。
+            //chunkFilename:"static/css/[name].[contenthash:10].chunk.css",
         }),
-        new CssMinimizerPlugin(),
+        //压缩css
+        // new CssMinimizerPlugin(), //放在optimization.minimizer里面了。
+        //压缩js, 开启多进程和设置进程数据。
+        // new TerserWebpackPlugin({
+        //     parallel:threads
+        // })
+        // preload预加载文件，
+        new PreloadWebpackPlugin({
+            rel:"preload",//网页显示之前，预加载好。
+            as:"script"
+            //rel:"prfetch" //空闲时加载
+        }),
+        new WorkboxPlugin.GenerateSW({
+            // 这些选项帮助快速启用 ServiceWorkers
+            // 不允许遗留任何“旧的” ServiceWorkers
+            clientsClaim: true,
+            skipWaiting: true,
+        }),
     ],
+    optimization: {
+        // 压缩的操作
+        minimizer: [
+            //压缩css
+            new CssMinimizerPlugin(),
+            //压缩js, 并且，开启多进程和设置进程数据。
+            new TerserWebpackPlugin({
+                 parallel:threads
+            }),
+            //压缩图片
+            new ImageMinimizerPlugin({
+                minimizer:{
+                    implementation: ImageMinimizerPlugin.imageminGenerate,
+                    options: {
+                        plugins: [
+                            ["gifsicle", { interlaced: true }],
+                            ["jpegtran", { progressive: true }],
+                            ["optipng", { optimizationLevel: 5 }],
+                            [
+                                "svgo",
+                                {
+                                    plugins:[
+                                        "preset-default",
+                                        "prefixIds",
+                                        {
+                                            name: "sortAttrs",
+                                            params: {
+                                                xmlnsOrder: "alphabetical"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        ]
+                    }
+                }
+            }),
+        ],
+        // 代码分割。
+        splitChunks: {
+            chunks: 'all', //所有的代码进行分割。 单入口只配置这个，剩下的用默认就好了。
+        },
+        // 映射。
+        runtimeChunk: {
+            name: entrypoint => `runtime~${entrypoint.name}.js`
+        }
+    },
     //模式
     mode: 'production',
     devtool: "source-map"

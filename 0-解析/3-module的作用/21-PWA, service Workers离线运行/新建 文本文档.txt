@@ -1,0 +1,3 @@
+npm install workbox-webpack-plugin --save-dev
+npm i serve -g
+运行这个命令才可以生效：serve sit
